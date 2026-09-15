@@ -5,4 +5,3 @@ allowBuilds:
 minimumReleaseAgeExclude:
   - '@clawnify/app@0.1.0'
   - '@clawnify/routes@0.2.1'
-onlyBuiltDependencies: better-sqlite3,esbuild
