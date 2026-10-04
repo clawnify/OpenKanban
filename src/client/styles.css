@@ -231,10 +231,77 @@ html:not([data-agent]) .card-title { padding-right: 24px; }
   letter-spacing: 1px;
 }
 .card:hover .card-menu-btn { opacity: 1; }
-.card-menu-btn:hover { background: var(--border); color: var(--text); }
+.card-menu-btn:hover { background: rgba(0,0,0,0.07); color: var(--text); }
 /* Human mode: card actions hidden by default, shown when menu is open */
 .card-actions.human-actions { display: none; }
 .card-actions.human-actions.open { display: flex; }
+
+/* Color swatches (list menu, card menu, add-list forms) */
+.color-swatches { display: flex; flex-wrap: wrap; gap: 6px; flex-basis: 100%; }
+.swatch {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid rgba(0,0,0,0.12);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+.swatch:hover { transform: scale(1.12); }
+.swatch.selected { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--text); }
+.swatch:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+/* "No color": white with a red slash */
+.swatch-none {
+  background: linear-gradient(135deg, transparent 45%, #ef4444 45%, #ef4444 55%, transparent 55%), #fff;
+  border-color: var(--border);
+}
+[data-agent] .swatch { width: 28px; height: 28px; }
+.card-actions .color-swatches { margin-top: 4px; }
+
+/* List header "…" menu */
+.list-header { position: relative; }
+.list-menu { position: relative; flex-shrink: 0; }
+.list-menu-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  width: 224px;
+  padding: 6px;
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.16);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.list-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.list-menu-item:hover { background: #f3f4f6; }
+.list-menu-item.danger { color: #dc2626; }
+.list-menu-item.danger:hover { background: #fef2f2; }
+.list-menu-section {
+  padding: 8px;
+  margin: 2px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.list-menu-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; }
+[data-agent] .list-menu-item { min-height: 44px; }
 
 .card-move-select {
   font-family: var(--font);

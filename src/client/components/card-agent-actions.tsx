@@ -1,5 +1,6 @@
 import { Pencil, Trash2 } from "lucide-preact";
 import { useBoard } from "../context";
+import { COLOR_KEYS, COLORS, type ColorKey } from "../colors";
 import type { Card } from "../types";
 import type { JSX } from "preact";
 
@@ -11,7 +12,7 @@ interface CardAgentActionsProps {
 }
 
 export function CardAgentActions({ card, listId, onEdit, onDelete }: CardAgentActionsProps) {
-  const { board, moveCard, setError } = useBoard();
+  const { board, moveCard, setCardColor, setError } = useBoard();
 
   const handleMove = (e: JSX.TargetedEvent<HTMLSelectElement>) => {
     const targetListId = parseInt((e.target as HTMLSelectElement).value, 10);
@@ -20,6 +21,13 @@ export function CardAgentActions({ card, listId, onEdit, onDelete }: CardAgentAc
     const index = targetList ? targetList.cards.length : 0;
     moveCard(card.id, targetListId, index).catch((err) =>
       setError("Move failed: " + (err as Error).message),
+    );
+  };
+
+  const handleColor = (e: JSX.TargetedEvent<HTMLSelectElement>) => {
+    const value = (e.target as HTMLSelectElement).value;
+    setCardColor(card.id, (value || null) as ColorKey | null).catch((err) =>
+      setError((err as Error).message),
     );
   };
 
@@ -41,6 +49,17 @@ export function CardAgentActions({ card, listId, onEdit, onDelete }: CardAgentAc
             ))}
         </select>
       )}
+      <select
+        class="card-move-select"
+        value={card.color ?? ""}
+        onChange={handleColor}
+        aria-label={`Color of card ${card.title}`}
+      >
+        <option value="">No color</option>
+        {COLOR_KEYS.map((key) => (
+          <option key={key} value={key}>{COLORS[key].label}</option>
+        ))}
+      </select>
       <button class="btn btn-sm" onClick={onEdit} aria-label={`Edit card ${card.title}`}>
         <Pencil size={14} /> Edit
       </button>

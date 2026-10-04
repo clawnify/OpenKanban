@@ -4,6 +4,7 @@ import { useDrag } from "../hooks/use-drag";
 import { CardMenu } from "./card-menu";
 import { CardAgentActions } from "./card-agent-actions";
 import { ConfirmBar } from "./confirm-bar";
+import { COLORS, type ColorKey } from "../colors";
 import type { Card as CardType } from "../types";
 
 interface CardProps {
@@ -14,7 +15,7 @@ interface CardProps {
 }
 
 export function Card({ card, listId, dropHint }: CardProps) {
-  const { isAgent, editCard, deleteCard, setError } = useBoard();
+  const { isAgent, editCard, setCardColor, deleteCard, setError } = useBoard();
   const { dragging, startDrag, endDrag } = useDrag();
   const isDragging = dragging?.cardId === card.id;
   const [editing, setEditing] = useState(false);
@@ -43,6 +44,14 @@ export function Card({ card, listId, dropHint }: CardProps) {
     });
   };
 
+  const handleColor = (c: ColorKey | null) => {
+    setCardColor(card.id, c).catch((err) => setError((err as Error).message));
+  };
+
+  const colorStyle = card.color
+    ? { background: COLORS[card.color].cardBg, borderColor: COLORS[card.color].cardBorder }
+    : {};
+
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === "Enter") handleSave();
     if (e.key === "Escape") setEditing(false);
@@ -50,7 +59,7 @@ export function Card({ card, listId, dropHint }: CardProps) {
 
   if (editing) {
     return (
-      <div class="card" role="article" aria-label={`Editing card: ${card.title}`}>
+      <div class="card" style={colorStyle} role="article" aria-label={`Editing card: ${card.title}`}>
         <div class="inline-form">
           {isAgent && <label for={`edit-title-${card.id}`}>Title</label>}
           <input
@@ -88,7 +97,7 @@ export function Card({ card, listId, dropHint }: CardProps) {
       draggable={!isAgent}
       onDragStart={isAgent ? undefined : (e) => startDrag(card.id, listId, e)}
       onDragEnd={isAgent ? undefined : endDrag}
-      style={isAgent ? undefined : { cursor: "grab" }}
+      style={isAgent ? colorStyle : { ...colorStyle, cursor: "grab" }}
       data-card-id={card.id}
       data-list-id={listId}
       role="article"
@@ -107,6 +116,8 @@ export function Card({ card, listId, dropHint }: CardProps) {
         <>
           {!isAgent && (
             <CardMenu
+              color={card.color}
+              onColor={handleColor}
               onEdit={() => {
                 setEditTitle(card.title);
                 setEditDesc(card.description || "");

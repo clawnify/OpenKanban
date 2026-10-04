@@ -21,7 +21,7 @@ Unlike Trello, Asana, or Monday.com, this runs entirely on your own infrastructu
 - **Card management** — create, edit, and delete cards with title and description
 - **Hover menus** — ellipsis menu on cards for quick actions (human mode)
 - **Agent mode** — "Move to" dropdowns, always-visible forms, explicit buttons
-- **Colored headers** — 8 rotating colors for visual distinction between lists
+- **Colors** — pick from 8 colors for each list header and card background
 - **SQLite persistence** — D1 (SQLite); `pnpm run dev` applies the schema on every start
 - **Dual-mode UI** — human-optimized + AI-agent-optimized (`?agent=true`)
 

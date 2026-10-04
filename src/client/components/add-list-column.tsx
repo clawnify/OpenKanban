@@ -1,12 +1,16 @@
 import { useState, useRef, useEffect } from "preact/hooks";
 import { Plus } from "lucide-preact";
 import { useBoard } from "../context";
+import { ColorSwatches } from "./color-swatches";
+import { nextListColor, type ColorKey } from "../colors";
 
 /** Trello-style "Add list" column at the end of the board. */
 export function AddListColumn() {
   const { isAgent, board, addList, setError } = useBoard();
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
+  // null: let the server pick the next palette color
+  const [color, setColor] = useState<ColorKey | null>(null);
   const columnRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -17,6 +21,7 @@ export function AddListColumn() {
   const close = () => {
     setShowForm(false);
     setTitle("");
+    setColor(null);
   };
 
   // Keep this column in view as new lists push it to the right
@@ -33,11 +38,12 @@ export function AddListColumn() {
       inputRef.current?.focus();
       return;
     }
-    addList(val)
+    addList(val, color ?? undefined)
       .then(scrollToEnd)
       .catch((err) => setError((err as Error).message));
     // Stay open, ready for the next list
     setTitle("");
+    setColor(null);
     inputRef.current?.focus();
   };
 
@@ -72,6 +78,12 @@ export function AddListColumn() {
             onInput={(e) => setTitle((e.target as HTMLInputElement).value)}
             onKeyDown={handleKeyDown}
             aria-label="Title for new list at end of board"
+          />
+          <ColorSwatches
+            value={color ?? nextListColor(board.length)}
+            onChange={(c) => c && setColor(c)}
+            label="List color"
+            variant="header"
           />
           <div class="inline-form-row">
             <button class="btn btn-primary btn-sm" onClick={handleAdd} aria-label="Add list">

@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from "preact/hooks";
 import { api } from "../api";
 import { planMove } from "../move";
 import type { BoardData } from "../types";
+import type { ColorKey } from "../colors";
 import type { BoardContextValue } from "../context";
 
 export function useBoardState(isAgent: boolean): BoardContextValue {
@@ -40,13 +41,25 @@ export function useBoardState(isAgent: boolean): BoardContextValue {
   }, [refresh]);
 
   const addList = useCallback(
-    (title: string) => enqueueCreate(() => api("POST", "/api/lists", { title })),
+    (title: string, color?: ColorKey) => enqueueCreate(() => api("POST", "/api/lists", { title, color })),
     [enqueueCreate],
   );
 
   const renameList = useCallback(async (id: number, title: string) => {
     await api("PUT", `/api/lists/${id}`, { title });
     await refresh();
+  }, [refresh]);
+
+  // Optimistic like moveCard: recolor at once, then sync with the server
+  const setListColor = useCallback(async (id: number, color: ColorKey) => {
+    const next = boardRef.current.map((l) => (l.id === id ? { ...l, color } : l));
+    boardRef.current = next;
+    setBoard(next);
+    try {
+      await api("PUT", `/api/lists/${id}`, { color });
+    } finally {
+      await refresh();
+    }
   }, [refresh]);
 
   const deleteList = useCallback(async (id: number) => {
@@ -63,6 +76,20 @@ export function useBoardState(isAgent: boolean): BoardContextValue {
   const editCard = useCallback(async (cardId: number, title: string, description: string) => {
     await api("PUT", `/api/cards/${cardId}`, { title, description });
     await refresh();
+  }, [refresh]);
+
+  const setCardColor = useCallback(async (cardId: number, color: ColorKey | null) => {
+    const next = boardRef.current.map((l) => ({
+      ...l,
+      cards: l.cards.map((c) => (c.id === cardId ? { ...c, color } : c)),
+    }));
+    boardRef.current = next;
+    setBoard(next);
+    try {
+      await api("PUT", `/api/cards/${cardId}`, { color });
+    } finally {
+      await refresh();
+    }
   }, [refresh]);
 
   const deleteCard = useCallback(async (cardId: number) => {
@@ -86,7 +113,7 @@ export function useBoardState(isAgent: boolean): BoardContextValue {
 
   return {
     board, isAgent, loading, error, setError, refresh,
-    addList, renameList, deleteList,
-    addCard, editCard, deleteCard, moveCard,
+    addList, renameList, setListColor, deleteList,
+    addCard, editCard, setCardColor, deleteCard, moveCard,
   };
 }

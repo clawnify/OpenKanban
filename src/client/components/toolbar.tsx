@@ -1,11 +1,15 @@
 import { useState, useRef, useEffect } from "preact/hooks";
 import { Plus } from "lucide-preact";
 import { useBoard } from "../context";
+import { ColorSwatches } from "./color-swatches";
+import { nextListColor, type ColorKey } from "../colors";
 
 export function Toolbar() {
-  const { isAgent, addList, setError } = useBoard();
+  const { isAgent, board, addList, setError } = useBoard();
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
+  // null: let the server pick the next palette color
+  const [color, setColor] = useState<ColorKey | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -15,9 +19,10 @@ export function Toolbar() {
   const handleAdd = () => {
     const val = title.trim();
     if (!val) return;
-    addList(val)
+    addList(val, color ?? undefined)
       .then(() => {
         setTitle("");
+        setColor(null);
         setShowForm(false);
       })
       .catch((err) => setError((err as Error).message));
@@ -28,6 +33,7 @@ export function Toolbar() {
     if (e.key === "Escape") {
       setShowForm(false);
       setTitle("");
+      setColor(null);
     }
   };
 
@@ -58,6 +64,12 @@ export function Toolbar() {
                 onKeyDown={handleKeyDown}
                 aria-label="New list title"
               />
+              <ColorSwatches
+                value={color ?? nextListColor(board.length)}
+                onChange={(c) => c && setColor(c)}
+                label="List color"
+                variant="header"
+              />
               <div class="inline-form-row">
                 <button class="btn btn-primary btn-sm" onClick={handleAdd} aria-label="Save new list">
                   Add
@@ -67,6 +79,7 @@ export function Toolbar() {
                   onClick={() => {
                     setShowForm(false);
                     setTitle("");
+                    setColor(null);
                   }}
                   aria-label="Cancel"
                 >
