@@ -1,12 +1,16 @@
 import { useState } from "preact/hooks";
 import { Ellipsis, Pencil, Trash2 } from "lucide-preact";
+import { ColorSwatches } from "./color-swatches";
+import type { ColorKey } from "../colors";
 
 interface CardMenuProps {
+  color: ColorKey | null;
   onEdit: () => void;
+  onColor: (color: ColorKey | null) => void;
   onDelete: () => void;
 }
 
-export function CardMenu({ onEdit, onDelete }: CardMenuProps) {
+export function CardMenu({ color, onEdit, onColor, onDelete }: CardMenuProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -28,6 +32,7 @@ export function CardMenu({ onEdit, onDelete }: CardMenuProps) {
         <button class="btn btn-sm btn-danger" onClick={onDelete} aria-label="Delete card">
           <Trash2 size={14} /> Delete
         </button>
+        <ColorSwatches value={color} onChange={onColor} label="Card color" variant="card" allowNone />
       </div>
     </>
   );

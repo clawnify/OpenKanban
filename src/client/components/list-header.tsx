@@ -1,16 +1,17 @@
 import { useState, useRef, useEffect } from "preact/hooks";
-import { X } from "lucide-preact";
 import { useBoard } from "../context";
 import { ConfirmBar } from "./confirm-bar";
+import { ListMenu } from "./list-menu";
+import { COLORS, type ColorKey } from "../colors";
 import type { List } from "../types";
 
 interface ListHeaderProps {
   list: List;
-  color: string;
+  color: ColorKey;
 }
 
 export function ListHeader({ list, color }: ListHeaderProps) {
-  const { isAgent, renameList, deleteList, setError } = useBoard();
+  const { isAgent, renameList, setListColor, deleteList, setError } = useBoard();
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(list.title);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -37,14 +38,23 @@ export function ListHeader({ list, color }: ListHeaderProps) {
     });
   };
 
+  const startRename = () => {
+    setRenameValue(list.title);
+    setRenaming(true);
+  };
+
+  const handleColor = (c: ColorKey) => {
+    setListColor(list.id, c).catch((err) => setError((err as Error).message));
+  };
+
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === "Enter") handleRename();
     if (e.key === "Escape") setRenaming(false);
   };
 
   return (
-    <div class="list-header" style={{ background: color }}>
-      <div class="list-header-left">
+    <div class="list-header" style={{ background: COLORS[color].header }}>
+      <div class={`list-header-left${renaming ? " renaming" : ""}`}>
         {renaming ? (
           <>
             {isAgent && (
@@ -60,7 +70,7 @@ export function ListHeader({ list, color }: ListHeaderProps) {
               onInput={(e) => setRenameValue((e.target as HTMLInputElement).value)}
               onKeyDown={handleKeyDown}
               aria-label="Rename list"
-              style={{ flex: 1, color: "#333" }}
+              style={{ color: "#333" }}
             />
             <button class="btn btn-sm" style={{ color: "#333" }} onClick={handleRename} aria-label="Save list name">
               Save
@@ -75,10 +85,7 @@ export function ListHeader({ list, color }: ListHeaderProps) {
             <span class="human-only" style={{ display: "inline-flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
               <span
                 class="list-title clickable"
-                onClick={() => {
-                  setRenameValue(list.title);
-                  setRenaming(true);
-                }}
+                onClick={startRename}
                 title="Click to rename"
               >
                 {list.title}
@@ -89,10 +96,7 @@ export function ListHeader({ list, color }: ListHeaderProps) {
               <span class="list-title">{list.title}</span>
               <button
                 class="btn btn-ghost btn-sm"
-                onClick={() => {
-                  setRenameValue(list.title);
-                  setRenaming(true);
-                }}
+                onClick={startRename}
                 aria-label={`Rename list ${list.title}`}
               >
                 Rename
@@ -113,13 +117,15 @@ export function ListHeader({ list, color }: ListHeaderProps) {
           style={{ color: "#fff" }}
         />
       ) : (
-        <button
-          class="btn btn-ghost btn-sm"
-          onClick={() => setConfirmDelete(true)}
-          aria-label={`Delete list ${list.title}`}
-        >
-          <X size={14} />
-        </button>
+        !renaming && (
+          <ListMenu
+            listTitle={list.title}
+            color={color}
+            onRename={startRename}
+            onColor={handleColor}
+            onDelete={() => setConfirmDelete(true)}
+          />
+        )
       )}
     </div>
   );

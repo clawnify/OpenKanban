@@ -9,6 +9,52 @@ const app = createApp<Env>({
   description: "A kanban board with lists and cards for task management.",
 });
 
+// ── Colors ─────────────────────────────────────────────────────────
+
+// Palette keys; the client maps each to its header and card shades
+// (src/client/colors.ts). New lists take the next color in this order.
+const COLOR_KEYS = ["indigo", "violet", "pink", "amber", "emerald", "cyan", "blue", "red"] as const;
+const ColorSchema = z.enum(COLOR_KEYS).openapi({ description: "Palette color key" });
+
+// Databases created before colors existed lack the `color` columns, and
+// schema.sql can only create tables, so add them on the first API request.
+// Lists without a color (older rows, demo/seed.sql) get the one they showed
+// when colors rotated by position.
+let colorsReady: Promise<void> | null = null;
+
+async function prepareColors() {
+  for (const table of ["lists", "cards"]) {
+    const columns = await query<{ name: string }>(`PRAGMA table_info(${table})`);
+    if (columns.some((col) => col.name === "color")) continue;
+    try {
+      await run(`ALTER TABLE ${table} ADD COLUMN color TEXT`);
+    } catch (err) {
+      // Another request added it first
+      if (!/duplicate column/i.test((err as Error).message)) throw err;
+    }
+  }
+  const lists = await query<{ id: number; color: string | null }>(
+    "SELECT id, color FROM lists ORDER BY position ASC"
+  );
+  for (const [i, list] of lists.entries()) {
+    if (list.color) continue;
+    await run("UPDATE lists SET color = ? WHERE id = ? AND color IS NULL", [COLOR_KEYS[i % COLOR_KEYS.length], list.id]);
+  }
+}
+
+app.use("/api/*", async (c, next) => {
+  colorsReady ??= prepareColors().catch((err) => {
+    colorsReady = null;
+    throw err;
+  });
+  try {
+    await colorsReady;
+  } catch (err) {
+    return c.json({ error: "Database upgrade failed: " + (err as Error).message }, 500);
+  }
+  await next();
+});
+
 // ── Shared Schemas ─────────────────────────────────────────────────
 
 const ErrorSchema = z.object({ error: z.string() }).openapi("Error");
@@ -18,6 +64,7 @@ const ListSchema = z.object({
   id: z.number().int(),
   title: z.string(),
   position: z.number().int(),
+  color: ColorSchema.nullable(),
   created_at: z.string(),
 }).openapi("List");
 
@@ -27,6 +74,7 @@ const CardSchema = z.object({
   title: z.string(),
   description: z.string(),
   position: z.number().int(),
+  color: ColorSchema.nullable(),
   created_at: z.string(),
   updated_at: z.string(),
 }).openapi("Card");
@@ -36,6 +84,12 @@ const ListWithCardsSchema = ListSchema.extend({
 }).openapi("ListWithCards");
 
 const IdParam = z.object({ id: z.string().openapi({ description: "Resource ID (integer)" }) });
+
+type ListRow = z.infer<typeof ListSchema>;
+type CardRow = z.infer<typeof CardSchema>;
+
+const LIST_COLUMNS = "id, title, position, color, created_at";
+const CARD_COLUMNS = "id, list_id, title, description, position, color, created_at, updated_at";
 
 // ── Lists ──────────────────────────────────────────────────────────
 
@@ -55,24 +109,8 @@ const listLists = createRoute({
 
 app.openapi(listLists, async (c) => {
   try {
-    const lists = await query<{
-      id: number;
-      title: string;
-      position: number;
-      created_at: string;
-    }>("SELECT id, title, position, created_at FROM lists ORDER BY position ASC");
-
-    const cards = await query<{
-      id: number;
-      list_id: number;
-      title: string;
-      description: string;
-      position: number;
-      created_at: string;
-      updated_at: string;
-    }>(
-      "SELECT id, list_id, title, description, position, created_at, updated_at FROM cards ORDER BY position ASC"
-    );
+    const lists = await query<ListRow>(`SELECT ${LIST_COLUMNS} FROM lists ORDER BY position ASC`);
+    const cards = await query<CardRow>(`SELECT ${CARD_COLUMNS} FROM cards ORDER BY position ASC`);
 
     const cardsByList = new Map<number, typeof cards>();
     for (const card of cards) {
@@ -101,7 +139,10 @@ const createList = createRoute({
   request: {
     body: {
       required: true,
-      content: { "application/json": { schema: z.object({ title: z.string().min(1) }) } },
+      content: { "application/json": { schema: z.object({
+        title: z.string().min(1),
+        color: ColorSchema.optional().openapi({ description: "Defaults to the next color in the palette" }),
+      }) } },
     },
   },
   responses: {
@@ -117,15 +158,17 @@ app.openapi(createList, async (c) => {
     const title = body.title.trim();
     if (!title) return c.json({ error: "Title is required" }, 400);
 
-    const maxPos = await get<{ max_pos: number }>(
-      "SELECT COALESCE(MAX(position), -1) as max_pos FROM lists"
+    const stats = await get<{ max_pos: number; count: number }>(
+      "SELECT COALESCE(MAX(position), -1) as max_pos, COUNT(*) as count FROM lists"
     );
-    const nextPos = (maxPos?.max_pos ?? -1) + 1;
+    const nextPos = (stats?.max_pos ?? -1) + 1;
+    const color = body.color ?? COLOR_KEYS[(stats?.count ?? 0) % COLOR_KEYS.length];
 
-    await run("INSERT INTO lists (title, position) VALUES (?, ?)", [title, nextPos]);
-    const inserted = await get(
-      "SELECT id, title, position, created_at FROM lists WHERE rowid = last_insert_rowid()"
+    await run("INSERT INTO lists (title, position, color) VALUES (?, ?, ?)", [title, nextPos, color]);
+    const inserted = await get<ListRow>(
+      `SELECT ${LIST_COLUMNS} FROM lists WHERE rowid = last_insert_rowid()`
     );
+    if (!inserted) return c.json({ error: "Failed to read back created list" }, 500);
 
     return c.json(inserted, 201);
   } catch (err: unknown) {
@@ -133,16 +176,19 @@ app.openapi(createList, async (c) => {
   }
 });
 
-const renameList = createRoute({
+const updateList = createRoute({
   method: "put",
   path: "/api/lists/{id}",
   tags: ["Lists"],
-  summary: "Rename a list",
+  summary: "Rename a list or change its color",
   request: {
     params: IdParam,
     body: {
       required: true,
-      content: { "application/json": { schema: z.object({ title: z.string().min(1) }) } },
+      content: { "application/json": { schema: z.object({
+        title: z.string().min(1).optional(),
+        color: ColorSchema.optional(),
+      }) } },
     },
   },
   responses: {
@@ -153,18 +199,23 @@ const renameList = createRoute({
   },
 });
 
-app.openapi(renameList, async (c) => {
+app.openapi(updateList, async (c) => {
   try {
     const { id: idStr } = c.req.valid("param");
     const id = parseInt(idStr, 10);
     const body = c.req.valid("json");
-    const title = body.title.trim();
+
+    const existing = await get<ListRow>(`SELECT ${LIST_COLUMNS} FROM lists WHERE id = ?`, [id]);
+    if (!existing) return c.json({ error: "List not found" }, 404);
+
+    const title = body.title !== undefined ? body.title.trim() : existing.title;
     if (!title) return c.json({ error: "Title is required" }, 400);
+    const color = body.color ?? existing.color;
 
-    const result = await run("UPDATE lists SET title = ? WHERE id = ?", [title, id]);
-    if (result.changes === 0) return c.json({ error: "List not found" }, 404);
+    await run("UPDATE lists SET title = ?, color = ? WHERE id = ?", [title, color, id]);
 
-    const updated = await get("SELECT id, title, position, created_at FROM lists WHERE id = ?", [id]);
+    const updated = await get<ListRow>(`SELECT ${LIST_COLUMNS} FROM lists WHERE id = ?`, [id]);
+    if (!updated) return c.json({ error: "Failed to read back updated list" }, 500);
     return c.json(updated, 200);
   } catch (err: unknown) {
     return c.json({ error: (err as Error).message }, 500);
@@ -212,6 +263,7 @@ const createCard = createRoute({
         list_id: z.number().int(),
         title: z.string().min(1),
         description: z.string().optional(),
+        color: ColorSchema.optional(),
       }) } },
     },
   },
@@ -239,13 +291,14 @@ app.openapi(createCard, async (c) => {
     const nextPos = (maxPos?.max_pos ?? -1) + 1;
 
     await run(
-      "INSERT INTO cards (list_id, title, description, position) VALUES (?, ?, ?, ?)",
-      [body.list_id, title, (body.description || "").trim(), nextPos]
+      "INSERT INTO cards (list_id, title, description, position, color) VALUES (?, ?, ?, ?, ?)",
+      [body.list_id, title, (body.description || "").trim(), nextPos, body.color ?? null]
     );
 
-    const inserted = await get(
-      "SELECT id, list_id, title, description, position, created_at, updated_at FROM cards WHERE rowid = last_insert_rowid()"
+    const inserted = await get<CardRow>(
+      `SELECT ${CARD_COLUMNS} FROM cards WHERE rowid = last_insert_rowid()`
     );
+    if (!inserted) return c.json({ error: "Failed to read back created card" }, 500);
 
     return c.json(inserted, 201);
   } catch (err: unknown) {
@@ -265,6 +318,7 @@ const updateCard = createRoute({
       content: { "application/json": { schema: z.object({
         title: z.string().optional(),
         description: z.string().optional(),
+        color: ColorSchema.nullable().optional().openapi({ description: "null removes the color" }),
       }) } },
     },
   },
@@ -282,26 +336,28 @@ app.openapi(updateCard, async (c) => {
     const id = parseInt(idStr, 10);
     const body = c.req.valid("json");
 
-    const existing = await get<{ id: number; title: string; description: string }>(
-      "SELECT id, title, description FROM cards WHERE id = ?",
+    const existing = await get<{ id: number; title: string; description: string; color: string | null }>(
+      "SELECT id, title, description, color FROM cards WHERE id = ?",
       [id]
     );
     if (!existing) return c.json({ error: "Card not found" }, 404);
 
     const newTitle = body.title !== undefined ? body.title.trim() : existing.title;
     const newDesc = body.description !== undefined ? body.description.trim() : existing.description;
+    const newColor = body.color !== undefined ? body.color : existing.color;
 
     if (!newTitle) return c.json({ error: "Title cannot be empty" }, 400);
 
     await run(
-      "UPDATE cards SET title = ?, description = ?, updated_at = datetime('now') WHERE id = ?",
-      [newTitle, newDesc, id]
+      "UPDATE cards SET title = ?, description = ?, color = ?, updated_at = datetime('now') WHERE id = ?",
+      [newTitle, newDesc, newColor, id]
     );
 
-    const updated = await get(
-      "SELECT id, list_id, title, description, position, created_at, updated_at FROM cards WHERE id = ?",
+    const updated = await get<CardRow>(
+      `SELECT ${CARD_COLUMNS} FROM cards WHERE id = ?`,
       [id]
     );
+    if (!updated) return c.json({ error: "Failed to read back updated card" }, 500);
 
     return c.json(updated, 200);
   } catch (err: unknown) {

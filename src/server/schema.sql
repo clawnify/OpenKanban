@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS lists (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   title TEXT NOT NULL,
   position INTEGER NOT NULL DEFAULT 0,
+  color TEXT,
   created_at TEXT DEFAULT (datetime('now'))
 );
 
@@ -11,6 +12,7 @@ CREATE TABLE IF NOT EXISTS cards (
   title TEXT NOT NULL,
   description TEXT DEFAULT '',
   position INTEGER NOT NULL DEFAULT 0,
+  color TEXT,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );

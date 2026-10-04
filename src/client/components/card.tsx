@@ -1,20 +1,23 @@
 import { useState, useRef, useEffect } from "preact/hooks";
 import { useBoard } from "../context";
+import { useDrag } from "../hooks/use-drag";
 import { CardMenu } from "./card-menu";
 import { CardAgentActions } from "./card-agent-actions";
 import { ConfirmBar } from "./confirm-bar";
+import { COLORS, type ColorKey } from "../colors";
 import type { Card as CardType } from "../types";
-import type { JSX } from "preact";
 
 interface CardProps {
   card: CardType;
   listId: number;
-  onDragStart: (cardId: number) => (e: JSX.TargetedDragEvent<HTMLDivElement>) => void;
-  onDragEnd: (e: JSX.TargetedDragEvent<HTMLDivElement>) => void;
+  /** Where to draw the drop indicator while another card is dragged over */
+  dropHint?: "before" | "after";
 }
 
-export function Card({ card, listId, onDragStart, onDragEnd }: CardProps) {
-  const { isAgent, editCard, deleteCard, setError } = useBoard();
+export function Card({ card, listId, dropHint }: CardProps) {
+  const { isAgent, editCard, setCardColor, deleteCard, setError } = useBoard();
+  const { dragging, startDrag, endDrag } = useDrag();
+  const isDragging = dragging?.cardId === card.id;
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editTitle, setEditTitle] = useState(card.title);
@@ -41,6 +44,14 @@ export function Card({ card, listId, onDragStart, onDragEnd }: CardProps) {
     });
   };
 
+  const handleColor = (c: ColorKey | null) => {
+    setCardColor(card.id, c).catch((err) => setError((err as Error).message));
+  };
+
+  const colorStyle = card.color
+    ? { background: COLORS[card.color].cardBg, borderColor: COLORS[card.color].cardBorder }
+    : {};
+
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === "Enter") handleSave();
     if (e.key === "Escape") setEditing(false);
@@ -48,7 +59,7 @@ export function Card({ card, listId, onDragStart, onDragEnd }: CardProps) {
 
   if (editing) {
     return (
-      <div class="card" role="article" aria-label={`Editing card: ${card.title}`}>
+      <div class="card" style={colorStyle} role="article" aria-label={`Editing card: ${card.title}`}>
         <div class="inline-form">
           {isAgent && <label for={`edit-title-${card.id}`}>Title</label>}
           <input
@@ -82,11 +93,11 @@ export function Card({ card, listId, onDragStart, onDragEnd }: CardProps) {
 
   return (
     <div
-      class="card"
+      class={`card${isDragging ? " dragging" : ""}${dropHint ? ` drop-${dropHint}` : ""}`}
       draggable={!isAgent}
-      onDragStart={onDragStart(card.id)}
-      onDragEnd={onDragEnd}
-      style={isAgent ? undefined : { cursor: "grab" }}
+      onDragStart={isAgent ? undefined : (e) => startDrag(card.id, listId, e)}
+      onDragEnd={isAgent ? undefined : endDrag}
+      style={isAgent ? colorStyle : { ...colorStyle, cursor: "grab" }}
       data-card-id={card.id}
       data-list-id={listId}
       role="article"
@@ -105,6 +116,8 @@ export function Card({ card, listId, onDragStart, onDragEnd }: CardProps) {
         <>
           {!isAgent && (
             <CardMenu
+              color={card.color}
+              onColor={handleColor}
               onEdit={() => {
                 setEditTitle(card.title);
                 setEditDesc(card.description || "");
