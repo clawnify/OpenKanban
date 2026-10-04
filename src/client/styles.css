@@ -9,6 +9,7 @@
   --radius: 8px;
   --radius-sm: 6px;
   --list-width: 300px;
+  --accent: #6366f1;
   --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
@@ -18,8 +19,15 @@ body {
   font-family: var(--font);
   background: var(--bg);
   color: var(--text);
-  min-height: 100vh;
-  overflow-x: auto;
+}
+
+/* App shell: toolbar sizes to its content, the board fills the rest.
+   Only the board scrolls horizontally and only lists scroll vertically. */
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
 }
 
 .toolbar {
@@ -29,21 +37,49 @@ body {
   padding: 16px 24px;
   background: #ffffff;
   border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 10;
+  flex-shrink: 0;
 }
 
 .toolbar-title { font-size: 20px; font-weight: 700; color: var(--text); }
 .toolbar-right { display: flex; align-items: center; gap: 8px; }
 
 .board {
+  flex: 1;
+  min-height: 0;
   display: flex;
   gap: 16px;
   padding: 24px;
-  min-height: calc(100vh - 65px);
   align-items: flex-start;
   overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.add-list-column { flex: 0 0 var(--list-width); width: var(--list-width); }
+.add-list-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 14px;
+  border: 1px dashed #c9cdd3;
+  border-radius: var(--radius);
+  background: rgba(0,0,0,0.03);
+  color: var(--text-secondary);
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.add-list-trigger:hover { background: rgba(99,102,241,0.06); border-color: var(--accent); color: var(--accent); }
+.add-list-form {
+  padding: 10px;
+  background: var(--card-bg);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
 
 .board-loading { color: var(--text-secondary); font-size: 14px; padding: 40px; }
@@ -55,7 +91,9 @@ body {
   box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - 110px);
+  width: var(--list-width);
+  min-width: 0;
+  max-height: 100%;
 }
 
 .list-header {
@@ -101,7 +139,11 @@ body {
   white-space: nowrap;
 }
 
+.list-header-left.renaming { flex-wrap: wrap; }
+.list-header-left.renaming input { flex: 1 1 100%; }
+
 .list-cards {
+  min-height: 0;
   padding: 8px;
   display: flex;
   flex-direction: column;
@@ -122,10 +164,50 @@ body {
   transition: box-shadow 0.15s ease;
 }
 .card:hover { box-shadow: var(--shadow-hover); }
-.card.dragging { opacity: 0.5; }
+.card.dragging { opacity: 0.4; }
 
-.card-title { font-size: 13px; font-weight: 500; margin-bottom: 2px; word-break: break-word; }
-.card-desc { font-size: 12px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Drag and drop: highlight the target list and draw a line where the card will land */
+.list { transition: box-shadow 0.1s ease; }
+.list.drag-over { box-shadow: 0 0 0 2px var(--accent), var(--shadow); }
+.card.drop-before::before,
+.card.drop-after::after {
+  content: "";
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+  pointer-events: none;
+}
+.card.drop-before::before { top: -6.5px; }
+.card.drop-after::after { bottom: -6.5px; }
+
+.list-empty {
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 8px;
+  text-align: center;
+  border: 1px dashed transparent;
+  border-radius: var(--radius-sm);
+}
+.list.drag-over .list-empty { border-color: var(--accent); color: var(--accent); }
+
+.card-title { font-size: 13px; font-weight: 500; margin-bottom: 2px; overflow-wrap: anywhere; }
+/* Leave room for the hover ellipsis button so long titles don't run under it */
+html:not([data-agent]) .card-title { padding-right: 24px; }
+/* Keep the description's line breaks, show up to 3 lines */
+.card-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
 .card-actions { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
 
 /* Human mode: ellipsis menu on hover */
@@ -209,6 +291,21 @@ textarea { resize: vertical; min-height: 60px; }
 .inline-form { display: flex; flex-direction: column; gap: 6px; }
 .inline-form-row { display: flex; gap: 6px; }
 .inline-form label { font-size: 12px; font-weight: 500; color: var(--text-secondary); }
+.form-hint { font-size: 11px; color: var(--text-secondary); }
+.btn-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  padding: 2px 0;
+  border: none;
+  background: none;
+  font-family: var(--font);
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.btn-link:hover { color: var(--accent); }
 
 .confirm-bar { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #dc2626; padding: 4px 0; }
 
@@ -248,5 +345,16 @@ textarea { resize: vertical; min-height: 60px; }
   padding: 12px;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  max-width: calc(100vw - 32px);
   z-index: 20;
+}
+
+/* Phones: columns nearly fill the screen with a peek of the next one */
+@media (max-width: 600px) {
+  :root { --list-width: calc(100vw - 56px); }
+  .toolbar { padding: 12px 16px; }
+  .toolbar-title { font-size: 18px; }
+  .board { padding: 16px; gap: 12px; scroll-snap-type: x proximity; scroll-padding: 16px; }
+  .list, .add-list-column { scroll-snap-align: start; }
+  .add-list-popover { right: 16px; }
 }

@@ -15,7 +15,8 @@ export interface BoardContextValue {
   addCard: (listId: number, title: string, description?: string) => Promise<void>;
   editCard: (cardId: number, title: string, description: string) => Promise<void>;
   deleteCard: (cardId: number) => Promise<void>;
-  moveCard: (cardId: number, targetListId: number, position: number) => Promise<void>;
+  /** Move a card to `index` among the target list's other cards */
+  moveCard: (cardId: number, targetListId: number, index: number) => Promise<void>;
 }
 
 export const BoardContext = createContext<BoardContextValue>(null!);

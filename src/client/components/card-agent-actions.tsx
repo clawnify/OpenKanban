@@ -17,8 +17,8 @@ export function CardAgentActions({ card, listId, onEdit, onDelete }: CardAgentAc
     const targetListId = parseInt((e.target as HTMLSelectElement).value, 10);
     if (!targetListId) return;
     const targetList = board.find((l) => l.id === targetListId);
-    const pos = targetList ? targetList.cards.length : 0;
-    moveCard(card.id, targetListId, pos).catch((err) =>
+    const index = targetList ? targetList.cards.length : 0;
+    moveCard(card.id, targetListId, index).catch((err) =>
       setError("Move failed: " + (err as Error).message),
     );
   };

@@ -37,6 +37,9 @@ const ListWithCardsSchema = ListSchema.extend({
 
 const IdParam = z.object({ id: z.string().openapi({ description: "Resource ID (integer)" }) });
 
+type ListRow = z.infer<typeof ListSchema>;
+type CardRow = z.infer<typeof CardSchema>;
+
 // ── Lists ──────────────────────────────────────────────────────────
 
 const listLists = createRoute({
@@ -123,9 +126,10 @@ app.openapi(createList, async (c) => {
     const nextPos = (maxPos?.max_pos ?? -1) + 1;
 
     await run("INSERT INTO lists (title, position) VALUES (?, ?)", [title, nextPos]);
-    const inserted = await get(
+    const inserted = await get<ListRow>(
       "SELECT id, title, position, created_at FROM lists WHERE rowid = last_insert_rowid()"
     );
+    if (!inserted) return c.json({ error: "Failed to read back created list" }, 500);
 
     return c.json(inserted, 201);
   } catch (err: unknown) {
@@ -164,7 +168,8 @@ app.openapi(renameList, async (c) => {
     const result = await run("UPDATE lists SET title = ? WHERE id = ?", [title, id]);
     if (result.changes === 0) return c.json({ error: "List not found" }, 404);
 
-    const updated = await get("SELECT id, title, position, created_at FROM lists WHERE id = ?", [id]);
+    const updated = await get<ListRow>("SELECT id, title, position, created_at FROM lists WHERE id = ?", [id]);
+    if (!updated) return c.json({ error: "Failed to read back updated list" }, 500);
     return c.json(updated, 200);
   } catch (err: unknown) {
     return c.json({ error: (err as Error).message }, 500);
@@ -243,9 +248,10 @@ app.openapi(createCard, async (c) => {
       [body.list_id, title, (body.description || "").trim(), nextPos]
     );
 
-    const inserted = await get(
+    const inserted = await get<CardRow>(
       "SELECT id, list_id, title, description, position, created_at, updated_at FROM cards WHERE rowid = last_insert_rowid()"
     );
+    if (!inserted) return c.json({ error: "Failed to read back created card" }, 500);
 
     return c.json(inserted, 201);
   } catch (err: unknown) {
@@ -298,10 +304,11 @@ app.openapi(updateCard, async (c) => {
       [newTitle, newDesc, id]
     );
 
-    const updated = await get(
+    const updated = await get<CardRow>(
       "SELECT id, list_id, title, description, position, created_at, updated_at FROM cards WHERE id = ?",
       [id]
     );
+    if (!updated) return c.json({ error: "Failed to read back updated card" }, 500);
 
     return c.json(updated, 200);
   } catch (err: unknown) {

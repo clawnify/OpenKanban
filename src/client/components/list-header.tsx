@@ -44,7 +44,7 @@ export function ListHeader({ list, color }: ListHeaderProps) {
 
   return (
     <div class="list-header" style={{ background: color }}>
-      <div class="list-header-left">
+      <div class={`list-header-left${renaming ? " renaming" : ""}`}>
         {renaming ? (
           <>
             {isAgent && (
@@ -60,7 +60,7 @@ export function ListHeader({ list, color }: ListHeaderProps) {
               onInput={(e) => setRenameValue((e.target as HTMLInputElement).value)}
               onKeyDown={handleKeyDown}
               aria-label="Rename list"
-              style={{ flex: 1, color: "#333" }}
+              style={{ color: "#333" }}
             />
             <button class="btn btn-sm" style={{ color: "#333" }} onClick={handleRename} aria-label="Save list name">
               Save

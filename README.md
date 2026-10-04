@@ -4,9 +4,9 @@
 
 [![Deploy with Clawnify](https://app.clawnify.com/deploy-button.svg)](https://app.clawnify.com/deploy?repo=clawnify/OpenKanban)
 
-A lightweight kanban board for building project management tools, task trackers, and workflow apps. Part of the [OpenClaw](https://github.com/openclaw/openclaw) ecosystem. Zero cloud dependencies — runs locally with SQLite.
+A lightweight kanban board for building project management tools, task trackers, and workflow apps. Part of the [OpenClaw](https://github.com/openclaw/openclaw) ecosystem. No API keys and no third-party services — the whole stack runs on your machine in local dev.
 
-Built with **Preact + Hono + SQLite**. Ships with a dual-mode UI: one for humans (drag-and-drop cards, hover menus) and one for AI agents (explicit buttons, large targets).
+Built with **Preact + Hono + Cloudflare D1**. Ships with a dual-mode UI: one for humans (drag-and-drop cards, hover menus) and one for AI agents (explicit buttons, large targets).
 
 ## What Is It?
 
@@ -22,19 +22,29 @@ Unlike Trello, Asana, or Monday.com, this runs entirely on your own infrastructu
 - **Hover menus** — ellipsis menu on cards for quick actions (human mode)
 - **Agent mode** — "Move to" dropdowns, always-visible forms, explicit buttons
 - **Colored headers** — 8 rotating colors for visual distinction between lists
-- **SQLite persistence** — auto-creates schema and seeds a default board on first run
+- **SQLite persistence** — D1 (SQLite); `pnpm run dev` applies the schema on every start
 - **Dual-mode UI** — human-optimized + AI-agent-optimized (`?agent=true`)
 
 ## Quickstart
 
 ```bash
 git clone https://github.com/clawnify/OpenKanban.git
-cd open-kanban
+cd OpenKanban
 pnpm install
 pnpm run dev
 ```
 
-Open `http://localhost:5173` in your browser. Data persists in `data.db`.
+This starts two processes: Vite on port 5173 (UI) and Wrangler on port 8787 (API).
+Open `http://localhost:5173` in your browser.
+
+The board starts empty — use **Add List** to create your first column.
+
+To load the sample board from `demo/seed.sql` instead, run `pnpm run seed`. Note
+that this **replaces** the current board contents, so it is safe to re-run but
+will discard anything you have added.
+
+Local data lives in `.wrangler/state/v3/d1/` (Miniflare's local D1). Delete that
+directory to reset the board.
 
 ### Agent Mode (for OpenClaw / Browser-Use)
 
@@ -52,13 +62,22 @@ This activates an agent-friendly UI with:
 
 The human UI stays unchanged — drag-and-drop, hover menus, and inline editing.
 
+## Scripts
+
+| Script | What it does |
+|--------|--------------|
+| `pnpm run dev` | Applies the schema, then runs Vite (5173) and Wrangler (8787) together |
+| `pnpm run build` | Builds the client bundle into `dist/` |
+| `pnpm run seed` | Resets the local board and loads `demo/seed.sql` |
+| `pnpm run typecheck` | Typechecks client + server with `tsc --noEmit` |
+
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
 | **Frontend** | Preact, TypeScript, Vite |
-| **Backend** | Hono, Node.js |
-| **Database** | SQLite (better-sqlite3) |
+| **Backend** | Hono on Cloudflare Workers (Wrangler/Miniflare in dev) |
+| **Database** | Cloudflare D1 (SQLite) via `@clawnify/db` |
 | **Icons** | Lucide |
 
 ### Prerequisites
@@ -66,13 +85,15 @@ The human UI stays unchanged — drag-and-drop, hover menus, and inline editing.
 - Node.js 20+
 - pnpm (or npm/yarn)
 
+No Cloudflare account is needed for local development — Wrangler runs D1 locally.
+
 ## Architecture
 
 ```
 src/
   server/
-    schema.sql  — SQLite schema (lists, cards with positions)
-    db.ts       — SQLite wrapper + seed logic
+    schema.sql  — D1 schema (lists, cards with positions)
+    db.ts       — re-exports the @clawnify/db query helpers
     index.ts    — Hono REST API (lists, cards, move, reorder)
   client/
     app.tsx               — Root component + agent mode detection
@@ -81,6 +102,7 @@ src/
     hooks/use-drag.ts     — HTML5 drag-and-drop logic
     components/
       toolbar.tsx           — Add List button + form
+      add-list-column.tsx   — "Add another list" column at the end of the board
       board.tsx             — Horizontal list container
       list.tsx              — List wrapper (column)
       list-header.tsx       — Title, count, rename, delete
@@ -125,7 +147,7 @@ cards (id, list_id → lists, title, description, position, created_at, updated_
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/board` | Full board (lists with nested cards) |
+| GET | `/api/lists` | Full board (lists with nested cards) |
 | POST | `/api/lists` | Create a list |
 | PUT | `/api/lists/:id` | Update list title |
 | DELETE | `/api/lists/:id` | Delete list + all cards |

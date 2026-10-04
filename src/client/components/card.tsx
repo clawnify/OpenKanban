@@ -1,20 +1,22 @@
 import { useState, useRef, useEffect } from "preact/hooks";
 import { useBoard } from "../context";
+import { useDrag } from "../hooks/use-drag";
 import { CardMenu } from "./card-menu";
 import { CardAgentActions } from "./card-agent-actions";
 import { ConfirmBar } from "./confirm-bar";
 import type { Card as CardType } from "../types";
-import type { JSX } from "preact";
 
 interface CardProps {
   card: CardType;
   listId: number;
-  onDragStart: (cardId: number) => (e: JSX.TargetedDragEvent<HTMLDivElement>) => void;
-  onDragEnd: (e: JSX.TargetedDragEvent<HTMLDivElement>) => void;
+  /** Where to draw the drop indicator while another card is dragged over */
+  dropHint?: "before" | "after";
 }
 
-export function Card({ card, listId, onDragStart, onDragEnd }: CardProps) {
+export function Card({ card, listId, dropHint }: CardProps) {
   const { isAgent, editCard, deleteCard, setError } = useBoard();
+  const { dragging, startDrag, endDrag } = useDrag();
+  const isDragging = dragging?.cardId === card.id;
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editTitle, setEditTitle] = useState(card.title);
@@ -82,10 +84,10 @@ export function Card({ card, listId, onDragStart, onDragEnd }: CardProps) {
 
   return (
     <div
-      class="card"
+      class={`card${isDragging ? " dragging" : ""}${dropHint ? ` drop-${dropHint}` : ""}`}
       draggable={!isAgent}
-      onDragStart={onDragStart(card.id)}
-      onDragEnd={onDragEnd}
+      onDragStart={isAgent ? undefined : (e) => startDrag(card.id, listId, e)}
+      onDragEnd={isAgent ? undefined : endDrag}
       style={isAgent ? undefined : { cursor: "grab" }}
       data-card-id={card.id}
       data-list-id={listId}

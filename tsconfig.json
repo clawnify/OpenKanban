@@ -5,6 +5,7 @@
     "moduleResolution": "Bundler",
     "strict": true,
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": ["@cloudflare/workers-types"],
     "jsx": "react-jsx",
     "jsxImportSource": "preact",
     "noEmit": true,

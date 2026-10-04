@@ -10,36 +10,64 @@ interface ListFooterProps {
 export function ListFooter({ list }: ListFooterProps) {
   const { isAgent, addCard, setError } = useBoard();
   const [showForm, setShowForm] = useState(false);
+  const [showDesc, setShowDesc] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const footerRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
+  const descRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (showForm && titleRef.current) titleRef.current.focus();
   }, [showForm]);
 
-  const handleAdd = () => {
-    const t = title.trim();
-    if (!t) return;
-    addCard(list.id, t, description.trim() || undefined).catch((err) =>
-      setError((err as Error).message),
-    );
+  useEffect(() => {
+    if (showDesc && descRef.current) descRef.current.focus();
+  }, [showDesc]);
+
+  const close = () => {
+    setShowForm(false);
+    setShowDesc(false);
     setTitle("");
     setDescription("");
-    if (!isAgent) setShowForm(false);
   };
 
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === "Enter") handleAdd();
-    if (e.key === "Escape") {
-      setShowForm(false);
-      setTitle("");
-      setDescription("");
+  const scrollToNewCard = () => {
+    const cards = footerRef.current?.closest(".list")?.querySelector(".list-cards");
+    if (cards) requestAnimationFrame(() => (cards.scrollTop = cards.scrollHeight));
+  };
+
+  const handleAdd = () => {
+    // Read from the inputs (not state) so fast typing followed by Enter
+    // never submits a stale value from before the last re-render
+    const t = (titleRef.current?.value ?? title).trim();
+    const d = (descRef.current?.value ?? description).trim();
+    if (!t) {
+      titleRef.current?.focus();
+      return;
     }
+    addCard(list.id, t, d || undefined)
+      .then(scrollToNewCard)
+      .catch((err) => setError((err as Error).message));
+    setTitle("");
+    setDescription("");
+    // Human mode: stay open, ready for the next card
+    setShowDesc(false);
+    titleRef.current?.focus();
+  };
+
+  // Enter adds the card; Shift+Enter is a new line in the description
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.isComposing) return;
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleAdd();
+    }
+    if (e.key === "Escape") close();
   };
 
   return (
-    <div class="list-footer">
+    <div class="list-footer" ref={footerRef}>
       {/* Human mode */}
       {!isAgent && !showForm && (
         <div class="human-only">
@@ -65,21 +93,29 @@ export function ListFooter({ list }: ListFooterProps) {
             onKeyDown={handleKeyDown}
             aria-label="Card title"
           />
+          {showDesc ? (
+            <textarea
+              ref={descRef}
+              placeholder="Description (optional)"
+              value={description}
+              onInput={(e) => setDescription((e.target as HTMLTextAreaElement).value)}
+              onKeyDown={handleKeyDown}
+              aria-label="Card description"
+            />
+          ) : (
+            <button class="btn-link" onClick={() => setShowDesc(true)} aria-label="Add description">
+              <Plus size={12} /> Add description
+            </button>
+          )}
           <div class="inline-form-row">
             <button class="btn btn-primary btn-sm" onClick={handleAdd} aria-label="Add card">
               Add
             </button>
-            <button
-              class="btn btn-sm"
-              onClick={() => {
-                setShowForm(false);
-                setTitle("");
-              }}
-              aria-label="Cancel"
-            >
+            <button class="btn btn-sm" onClick={close} aria-label="Cancel">
               Cancel
             </button>
           </div>
+          <div class="form-hint">Enter to add · Shift+Enter for a new line · Esc to close</div>
         </div>
       )}
 
