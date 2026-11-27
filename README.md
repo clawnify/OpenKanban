@@ -4,13 +4,15 @@
 
 [![Deploy with Clawnify](https://app.clawnify.com/deploy-button.svg)](https://app.clawnify.com/deploy?repo=clawnify/OpenKanban)
 
-A lightweight kanban board for building project management tools, task trackers, and workflow apps. Part of the [OpenClaw](https://github.com/openclaw/openclaw) ecosystem. Zero cloud dependencies — runs locally with SQLite.
+A lightweight kanban board for building project management tools, task trackers, and workflow apps. Zero cloud dependencies — runs locally with SQLite.
+
+The app is open source. Deploy it to Clawnify to use it from ChatGPT, Claude, or other MCP-compatible AI chats through the Clawnify connector.
 
 Built with **Preact + Hono + SQLite**. Ships with a dual-mode UI: one for humans (drag-and-drop cards, hover menus) and one for AI agents (explicit buttons, large targets).
 
 ## What Is It?
 
-Clawnify OpenKanban is a production-ready kanban board designed for the OpenClaw community. Think of it as an open-source Trello alternative — a project board you can self-host, customize, and embed in any SaaS product.
+Clawnify OpenKanban is a production-ready kanban board. Think of it as an open-source Trello alternative — a project board you can self-host, customize, and embed in any SaaS product.
 
 Unlike Trello, Asana, or Monday.com, this runs entirely on your own infrastructure with no API keys, no vendor lock-in, and no per-seat pricing. It provides a complete task management and workflow system. Create lists, add cards, drag between columns, and manage projects — all out of the box.
 
@@ -36,7 +38,7 @@ pnpm run dev
 
 Open `http://localhost:5173` in your browser. Data persists in `data.db`.
 
-### Agent Mode (for OpenClaw / Browser-Use)
+### Agent Mode (for browser automation)
 
 Append `?agent=true` to the URL:
 
@@ -136,7 +138,7 @@ cards (id, list_id → lists, title, description, position, created_at, updated_
 
 ## Community & Contributions
 
-This project is part of the [OpenClaw](https://github.com/openclaw/openclaw) ecosystem. Contributions are welcome — open an issue or submit a PR.
+Contributions are welcome — open an issue or submit a PR.
 
 ## License
 
